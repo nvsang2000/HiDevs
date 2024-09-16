@@ -1,0 +1,167 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgres"
+  url      = env("DATABASE_URL")
+}
+
+model Policy {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique @db.VarChar(128)
+  isActive    Boolean   @default(true)
+  permissions Json?
+  createdAt   DateTime? @default(now()) @db.Timestamptz()
+  updatedAt   DateTime? @updatedAt @db.Timestamptz()
+  updatedById String?   @db.Uuid
+  createrId   String?   @db.Uuid
+  users       User[]    @relation("OneUserOnePolicy")
+
+  @@map("policies")
+}
+
+model User {
+  id        String         @id @default(uuid()) @db.Uuid
+  fullName  String         @db.VarChar(255)
+  email     String         @db.VarChar(255)
+  phone     String         @db.VarChar(24)
+  username  String         @db.VarChar(128)
+  password  String         @db.VarChar(255)
+  role      Role           @default(USER)
+  thumbnail String?        @db.VarChar(400)
+  isActive  Boolean?       @default(true)
+  lastSeen  DateTime?      @default(now()) @db.Timestamptz()
+  policyId  Int?
+  createrId String?        @db.Uuid
+  authId    String         @db.Uuid
+  profileId String         @db.Uuid
+  updatedAt DateTime?      @updatedAt @db.Timestamptz()
+  createdAt DateTime?      @default(now()) @db.Timestamptz()
+  policy    Policy?        @relation("OneUserOnePolicy", fields: [policyId], references: [id])
+  profile   Profile?       @relation("OneUserOneProfile")
+  auth      OAuthStrategy? @relation("OneUserOneAuth")
+
+  @@index([email])
+  @@index([phone])
+  @@index([username])
+  @@map("users")
+}
+
+model OAuthStrategy {
+  id           String    @id @default(uuid()) @db.Uuid
+  accessToken  String
+  refreshToken String
+  userId       String    @unique @db.Uuid
+  updatedAt    DateTime? @updatedAt @db.Timestamptz()
+  createdAt    DateTime? @default(now()) @db.Timestamptz()
+  user         User      @relation("OneUserOneAuth", fields: [userId], references: [id])
+
+  @@map("oauth_strategies")
+}
+
+model Profile {
+  id        String    @id @default(uuid()) @db.Uuid
+  slug      String    @unique
+  userId    String    @unique @db.Uuid
+  avatar    String?
+  nickname  String    @db.VarChar(32)
+  gender    Gender    @default(OTHER)
+  bio       String?   @db.VarChar(150)
+  updatedAt DateTime? @updatedAt @db.Timestamptz()
+  createdAt DateTime? @default(now()) @db.Timestamptz()
+  posts     Post[]    @relation("OneProfileManyPost")
+  comments  Comment[] @relation("OneProfileManyComment")
+  reacts    React[]   @relation("OneProfileManyReact")
+  user      User      @relation("OneUserOneProfile", fields: [userId], references: [id])
+
+  @@map("profiles")
+}
+
+model Post {
+  id           String    @id @default(uuid()) @db.Uuid
+  slug         String    @unique
+  title        String    @db.VarChar(128)
+  summary      String?   @db.VarChar(255)
+  content      String
+  thumbnail    String
+  tags         Tag[]     @relation("TagsOnPosts")
+  comments     Comment[] @relation("OnePostManyComment")
+  reacts       React[]   @relation("OnePostManyReact")
+  author_id    String    @db.Uuid
+  author       Profile   @relation("OneProfileManyPost", fields: [author_id], references: [id])
+  published    Boolean   @default(false)
+  published_at DateTime? @db.Timestamptz()
+  created_at   DateTime  @default(now()) @db.Timestamptz()
+  updated_at   DateTime? @updatedAt @db.Timestamptz()
+
+  @@map("posts")
+}
+
+model React {
+  id         String    @id @default(uuid()) @db.Uuid
+  post_id    String    @db.Uuid
+  post       Post      @relation("OnePostManyReact", fields: [post_id], references: [id])
+  author_id  String    @db.Uuid
+  author     Profile   @relation("OneProfileManyReact", fields: [author_id], references: [id])
+  created_at DateTime  @default(now()) @db.Timestamptz()
+  updated_at DateTime? @updatedAt @db.Timestamptz()
+
+  @@map("reacts")
+}
+
+model Comment {
+  id         String    @id @default(uuid()) @db.Uuid
+  content    String    @db.VarChar(255)
+  post_id    String    @db.Uuid
+  post       Post      @relation("OnePostManyComment", fields: [post_id], references: [id])
+  author_id  String    @db.Uuid
+  author     Profile   @relation("OneProfileManyComment", fields: [author_id], references: [id])
+  created_at DateTime  @default(now()) @db.Timestamptz()
+  updated_at DateTime? @updatedAt @db.Timestamptz()
+
+  @@map("comments")
+}
+
+model Tag {
+  id          String    @id @default(uuid()) @db.Uuid
+  title       String    @unique @db.VarChar(64)
+  slug        String    @unique @db.VarChar(64)
+  description String?   @db.VarChar(512)
+  thumbnail   String?
+  posts       Post[]    @relation("TagsOnPosts")
+  created_at  DateTime  @default(now()) @db.Timestamptz()
+  updated_at  DateTime? @updatedAt @db.Timestamptz()
+
+  @@map("tags")
+}
+
+model File {
+  id           String    @id @default(uuid()) @db.Uuid
+  fieldname    String
+  originalname String
+  encoding     String
+  mimetype     String
+  destination  String
+  filename     String    @unique
+  path         String    @unique
+  size         Int
+  created_at   DateTime  @default(now()) @db.Timestamptz()
+  updated_at   DateTime? @updatedAt @db.Timestamptz()
+
+  @@map("files")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum Role {
+  USER
+  ADMIN
+}
